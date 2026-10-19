@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { MotionConfig } from 'framer-motion';
-import { Compass } from 'lucide-react';
 import { IntroView } from '@/components/IntroView';
+import { LeadFormView } from '@/components/LeadFormView';
 import { OctagonChart } from '@/components/OctagonChart';
 import { ProgressHeader } from '@/components/ProgressHeader';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -21,10 +22,17 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [hydrated, stage, currentIndex]);
 
-  const mainLabel = !hydrated ? 'Carregando diagnóstico'
-    : stage === 'quiz' ? `Questão ${currentIndex + 1} de ${assessment.totalQuestions}: ${currentQuestion.title}`
-      : stage === 'calculating' ? 'Calculando seu diagnóstico'
-        : stage === 'result' ? 'Resultado do diagnóstico' : 'Assessment de Prontidão em IA';
+  const mainLabel = !hydrated
+    ? 'Carregando diagnóstico'
+    : stage === 'lead'
+      ? 'Identificação para o diagnóstico'
+      : stage === 'quiz'
+        ? `Questão ${currentIndex + 1} de ${assessment.totalQuestions}: ${currentQuestion.title}`
+        : stage === 'calculating'
+          ? 'Calculando seu diagnóstico'
+          : stage === 'result'
+            ? 'Resultado do diagnóstico'
+            : 'Assessment de Prontidão em IA';
 
   return (
     <MotionConfig reducedMotion="user">
@@ -35,15 +43,17 @@ export default function Home() {
         Ir para o conteúdo
       </a>
 
-      {hydrated && (stage === 'quiz' || stage === 'calculating') && (
+      {hydrated && (stage === 'lead' || stage === 'quiz' || stage === 'calculating') && (
         <header className="w-full bg-[#000000] text-[#FFFFFF] border-b border-[#292929]">
           <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAB600] text-[#000000]">
-              <Compass className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
-            </div>
-            <span className="text-sm font-bold tracking-wide text-[#FFFFFF]">
-              Innoscience
-            </span>
+            <Image
+              src="/logo-branca.png"
+              alt="Innoscience"
+              width={132}
+              height={36}
+              priority
+              className="h-6 sm:h-7 w-auto object-contain"
+            />
             <span className="ml-auto text-xs font-semibold text-[#FAB600]">
               Octógono da IA
             </span>
@@ -70,6 +80,14 @@ export default function Home() {
           <IntroView onStart={assessment.start} answeredCount={assessment.result.answeredCount} />
         )}
 
+        {hydrated && stage === 'lead' && (
+          <LeadFormView
+            initialLead={assessment.lead}
+            onSubmit={assessment.submitLead}
+            onBack={assessment.goBack}
+          />
+        )}
+
         {hydrated && stage === 'quiz' && (
           <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pb-12 pt-6 sm:space-y-8 sm:px-6 sm:pt-8 lg:px-8">
             <h1 className="sr-only">Assessment de Prontidão em IA</h1>
@@ -86,7 +104,11 @@ export default function Home() {
               currentIndex={currentIndex}
               totalQuestions={assessment.totalQuestions}
               selectedValue={assessment.answers[currentQuestion.id]}
+              comment={assessment.comments[currentQuestion.id] ?? ''}
               onAnswer={assessment.answerQuestion}
+              onCommentChange={(comment) =>
+                assessment.commentQuestion(comment, currentQuestion.id)
+              }
               onBack={assessment.goBack}
               onNext={assessment.goNext}
               canAdvance={assessment.canAdvance}
@@ -113,7 +135,13 @@ export default function Home() {
         )}
 
         {hydrated && stage === 'result' && (
-          <ResultView result={assessment.result} onRestart={assessment.restart} />
+          <ResultView
+            result={assessment.result}
+            lead={assessment.lead}
+            comments={assessment.comments}
+            submissionId={assessment.submittedId}
+            onRestart={assessment.restart}
+          />
         )}
 
         <noscript>
@@ -125,3 +153,4 @@ export default function Home() {
     </MotionConfig>
   );
 }
+

@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   title: 'Assessment de Prontidão em IA · Octógono da IA | Innoscience',
   description:
     'Identifique os avanços e as principais lacunas da sua empresa nas oito dimensões do Octógono da IA e receba uma leitura executiva da sua prontidão.',
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

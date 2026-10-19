@@ -1,8 +1,15 @@
 'use client';
 
-import React, { useId, useRef } from 'react';
+import React, { useId } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CheckCircle2, HelpCircle, Keyboard } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  HelpCircle,
+  Keyboard,
+  MessageSquareText,
+} from 'lucide-react';
 import {
   dimensions as defaultDimensions,
   questions as defaultQuestions,
@@ -30,11 +37,15 @@ export interface QuestionCardProps {
   totalQuestions?: number;
   /** Resposta atualmente selecionada para esta questao */
   selectedValue?: AnswerValue;
+  /** Comentario livre associado a esta questao */
+  comment?: string;
   /** Opcoes da escala (padrao: scaleOptions de assessment-data) */
   scaleOptions?: readonly ScaleOption[];
   /** Callback ao selecionar uma resposta (0..6), informando se deve avancar automaticamente */
   onAnswer?: (value: AnswerValue, options?: AnswerChangeOptions) => void;
-  /** Callback para voltar para a questao anterior (ou intro na Q1) */
+  /** Callback ao alterar o comentario livre da questao */
+  onCommentChange?: (comment: string) => void;
+  /** Callback para voltar para a questao anterior (ou etapa anterior na Q1) */
   onBack?: () => void;
   /** Callback opcional para avancar manualmente */
   onNext?: () => void;
@@ -54,17 +65,16 @@ export function QuestionCard({
   currentIndex,
   totalQuestions,
   selectedValue,
+  comment = '',
   scaleOptions = defaultScaleOptions,
   onAnswer,
+  onCommentChange,
   onBack,
   onNext,
   canGoBack = true,
 }: QuestionCardProps) {
   const groupId = useId();
   const prefersReducedMotion = useReducedMotion();
-
-  // Rastreia se a mudanca no radio nativo veio das setas do teclado (nao deve auto-avancar)
-  const isArrowKeySelectionRef = useRef(false);
 
   const resolvedIndex =
     currentIndex ?? (questionProp ? Math.max(0, questionProp.id - 1) : 0);
@@ -81,40 +91,11 @@ export function QuestionCard({
   const currentAnswer = selectedValue;
 
   const handleChoose = (val: AnswerValue, options?: AnswerChangeOptions) => {
-    onAnswer?.(val, options);
-  };
-
-  const handleRadioKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (
-      event.key === 'ArrowUp' ||
-      event.key === 'ArrowDown' ||
-      event.key === 'ArrowLeft' ||
-      event.key === 'ArrowRight'
-    ) {
-      isArrowKeySelectionRef.current = true;
-    } else {
-      isArrowKeySelectionRef.current = false;
-    }
-  };
-
-  const handleRadioPointerDown = () => {
-    isArrowKeySelectionRef.current = false;
+    onAnswer?.(val, { autoAdvance: options?.autoAdvance ?? false });
   };
 
   const handleRadioChange = (val: AnswerValue) => {
-    const autoAdvance = !isArrowKeySelectionRef.current;
-    isArrowKeySelectionRef.current = false;
-    handleChoose(val, { autoAdvance });
-  };
-
-  const handleRadioClick = (val: AnswerValue, wasAlreadySelected: boolean) => {
-    if (isArrowKeySelectionRef.current) {
-      isArrowKeySelectionRef.current = false;
-      return;
-    }
-    if (wasAlreadySelected) {
-      handleChoose(val, { autoAdvance: true });
-    }
+    handleChoose(val, { autoAdvance: false });
   };
 
   const scoredOptions = scaleOptions.filter((opt) => opt.value !== 6);
@@ -177,7 +158,6 @@ export function QuestionCard({
                 return (
                   <label
                     key={option.value}
-                    onPointerDown={handleRadioPointerDown}
                     className={`group relative flex items-start sm:items-center gap-3.5 sm:gap-4 rounded-xl border p-3.5 sm:px-5 sm:py-4 cursor-pointer transition-all duration-200 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#FAB600] has-[:focus-visible]:outline-offset-2 ${
                       isSelected
                         ? 'border-[#FAB600] bg-[#FAB600] text-[#000000] shadow-[0_6px_20px_rgba(250,182,0,0.28)]'
@@ -189,9 +169,7 @@ export function QuestionCard({
                       name={`question-${question.id}`}
                       value={option.value}
                       checked={isSelected}
-                      onKeyDown={handleRadioKeyDown}
                       onChange={() => handleRadioChange(option.value)}
-                      onClick={() => handleRadioClick(option.value, isSelected)}
                       className="sr-only"
                     />
 
@@ -243,7 +221,6 @@ export function QuestionCard({
             {unknownOption && (
               <div className="pt-2">
                 <label
-                  onPointerDown={handleRadioPointerDown}
                   className={`group relative flex items-center justify-between gap-4 rounded-xl border border-dashed px-4 py-3 sm:px-5 sm:py-3.5 cursor-pointer transition-all duration-200 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#FAB600] has-[:focus-visible]:outline-offset-2 ${
                     currentAnswer === 6
                       ? 'border-[#FAB600] bg-[#FAB600] text-[#000000] shadow-[0_6px_20px_rgba(250,182,0,0.25)]'
@@ -255,9 +232,7 @@ export function QuestionCard({
                     name={`question-${question.id}`}
                     value={unknownOption.value}
                     checked={currentAnswer === 6}
-                    onKeyDown={handleRadioKeyDown}
                     onChange={() => handleRadioChange(6)}
-                    onClick={() => handleRadioClick(6, currentAnswer === 6)}
                     className="sr-only"
                   />
 
@@ -318,6 +293,33 @@ export function QuestionCard({
             )}
           </fieldset>
 
+          {/* Campo livre para comentários abaixo de cada questão */}
+          <div className="space-y-2 pt-1">
+            <label
+              htmlFor={`question-comment-${groupId}-${question.id}`}
+              className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#292929]"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <MessageSquareText
+                  className="h-3.5 w-3.5 text-[#E0A400]"
+                  aria-hidden="true"
+                />
+                <span>Comentários sobre esta questão</span>
+              </span>
+              <span className="font-normal normal-case tracking-normal text-[#6B7280]">
+                Opcional
+              </span>
+            </label>
+            <textarea
+              id={`question-comment-${groupId}-${question.id}`}
+              rows={2}
+              value={comment}
+              onChange={(event) => onCommentChange?.(event.target.value)}
+              placeholder="Adicione observações, exemplos práticos ou contexto sobre esta questão na sua empresa..."
+              className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111111] placeholder:text-[#888888] transition-colors focus:border-[#FAB600] focus:bg-[#FFFFFF] focus:outline-none resize-y"
+            />
+          </div>
+
           {/* Rodape de navegacao e dica de atalhos */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#E5E7EB]">
             <div>
@@ -329,7 +331,7 @@ export function QuestionCard({
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   <span>
-                    {resolvedIndex === 0 ? 'Voltar ao início' : 'Questão anterior'}
+                    {resolvedIndex === 0 ? 'Voltar aos dados' : 'Questão anterior'}
                   </span>
                 </button>
               ) : (
@@ -341,16 +343,21 @@ export function QuestionCard({
               <div className="hidden md:flex items-center gap-2 text-xs text-[#6B7280]">
                 <Keyboard className="h-3.5 w-3.5 text-[#E0A400]" aria-hidden="true" />
                 <span>
-                  Use as teclas <strong className="text-[#111111]">0–5</strong> ou{' '}
-                  <strong className="text-[#111111]">N</strong> para responder rapidamente
+                  Teclas <strong className="text-[#111111]">0–5</strong> ou{' '}
+                  <strong className="text-[#111111]">N</strong> marcam a nota
                 </span>
               </div>
 
-              {onNext && currentAnswer !== undefined && (
+              {onNext && (
                 <button
                   type="button"
                   onClick={onNext}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#FAB600] px-5 py-2.5 text-xs sm:text-sm font-bold text-[#000000] transition-colors hover:bg-[#E0A400] cursor-pointer"
+                  disabled={currentAnswer === undefined}
+                  className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+                    currentAnswer !== undefined
+                      ? 'bg-[#FAB600] text-[#000000] shadow-[0_4px_14px_rgba(250,182,0,0.28)] hover:bg-[#E0A400] cursor-pointer'
+                      : 'bg-[#E5E7EB] text-[#888888] cursor-not-allowed'
+                  }`}
                 >
                   <span>
                     {resolvedIndex + 1 >= resolvedTotal
@@ -369,3 +376,4 @@ export function QuestionCard({
 }
 
 export default QuestionCard;
+

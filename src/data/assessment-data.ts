@@ -1,6 +1,40 @@
-import type { AssessmentDimension, AssessmentQuestion, ScaleOption, ResultContent, MaturityLevel } from '@/types/assessment';
+import type { AssessmentDimension, AssessmentLead, AssessmentQuestion, ScaleOption, ResultContent, MaturityLevel } from '@/types/assessment';
 
-export const CTA_URL = 'https://innoscience.com.br/contato';
+export const CTA_BASE_URL = 'https://innoscience.com.br/contato';
+export const CTA_URL =
+  'https://innoscience.com.br/contato?utm_source=assessment-ia&utm_medium=diagnostico&utm_campaign=octogono-ia&origem=assessment-octogono-ia';
+
+export function buildTrackedCtaUrl(options?: {
+  baseUrl?: string;
+  level?: MaturityLevel | null;
+  overallAverage?: number | null;
+  lead?: AssessmentLead | null;
+  submissionId?: string | null;
+}): string {
+  const rawBase = options?.baseUrl ?? CTA_URL;
+  try {
+    const url = new URL(rawBase);
+    if (!url.searchParams.has('utm_source')) url.searchParams.set('utm_source', 'assessment-ia');
+    if (!url.searchParams.has('utm_medium')) url.searchParams.set('utm_medium', 'diagnostico');
+    if (!url.searchParams.has('utm_campaign')) url.searchParams.set('utm_campaign', 'octogono-ia');
+    if (!url.searchParams.has('origem')) url.searchParams.set('origem', 'assessment-octogono-ia');
+    if (options?.level) {
+      url.searchParams.set('nivel', options.level);
+    }
+    if (typeof options?.overallAverage === 'number' && Number.isFinite(options.overallAverage)) {
+      url.searchParams.set('media', options.overallAverage.toFixed(1));
+    }
+    if (options?.lead?.company?.trim()) {
+      url.searchParams.set('empresa', options.lead.company.trim());
+    }
+    if (options?.submissionId?.trim()) {
+      url.searchParams.set('submission_id', options.submissionId.trim());
+    }
+    return url.toString();
+  } catch {
+    return rawBase;
+  }
+}
 
 // Textos transcritos da nota texto-de-abertura-identifiqu.
 export const openingText = "Identifique os avanços e as principais lacunas da sua empresa nas oito dimensões do Octógono da IA. Ao final, você receberá uma leitura inicial da sua prontidão e orientações sobre onde concentrar os próximos esforços.";
@@ -8,7 +42,7 @@ export const instructionText = "Responda considerando a situação atual da empr
 export const dimensions = [
   {
     "id": "estrategia",
-    "name": "Estratégia",
+    "name": "Estratégia IA",
     "questionIds": [
       1,
       2
@@ -16,7 +50,7 @@ export const dimensions = [
   },
   {
     "id": "lideranca",
-    "name": "Liderança",
+    "name": "Liderança IA",
     "questionIds": [
       3,
       4
@@ -24,7 +58,7 @@ export const dimensions = [
   },
   {
     "id": "governanca",
-    "name": "Governança",
+    "name": "Governança IA",
     "questionIds": [
       5,
       6
@@ -32,7 +66,7 @@ export const dimensions = [
   },
   {
     "id": "tecnologia",
-    "name": "Tecnologia",
+    "name": "Tecnologia IA",
     "questionIds": [
       7,
       8
@@ -40,7 +74,7 @@ export const dimensions = [
   },
   {
     "id": "cultura",
-    "name": "Cultura",
+    "name": "Cultura IA",
     "questionIds": [
       9,
       10
@@ -48,7 +82,7 @@ export const dimensions = [
   },
   {
     "id": "funding",
-    "name": "Funding",
+    "name": "Funding IA",
     "questionIds": [
       11,
       12
@@ -56,7 +90,7 @@ export const dimensions = [
   },
   {
     "id": "pessoas",
-    "name": "Pessoas",
+    "name": "Pessoas IA",
     "questionIds": [
       13,
       14
@@ -64,7 +98,7 @@ export const dimensions = [
   },
   {
     "id": "relacionamentos",
-    "name": "Relacionamentos",
+    "name": "Relacionamentos IA",
     "questionIds": [
       15,
       16

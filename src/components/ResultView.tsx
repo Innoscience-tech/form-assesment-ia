@@ -1,20 +1,29 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowUpRight,
-  Compass,
+  Building2,
   Info,
+  MessageSquareText,
   RotateCcw,
   Sparkles,
   Target,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import { resultContents } from '@/data/assessment-data';
+import {
+  buildTrackedCtaUrl,
+  CTA_URL,
+  questions as defaultQuestions,
+  resultContents,
+} from '@/data/assessment-data';
 import type {
+  AssessmentComments,
+  AssessmentLead,
   AssessmentResult,
   DimensionId,
   MaturityLevel,
@@ -24,6 +33,12 @@ import { OctagonChart } from './OctagonChart';
 export interface ResultViewProps {
   /** Resultado calculado por calculateAssessment */
   result: AssessmentResult;
+  /** Dados de identificacao preenchidos no inicio */
+  lead?: AssessmentLead | null;
+  /** Comentarios registrados por questao */
+  comments?: AssessmentComments;
+  /** ID da submissao salva no Supabase */
+  submissionId?: string | null;
   /** Callback para reiniciar o diagnostico */
   onRestart?: () => void;
   /** Alias para onRestart */
@@ -64,15 +79,33 @@ function getLevelMeta(level: MaturityLevel | null) {
 
 export function ResultView({
   result,
+  lead,
+  comments,
+  submissionId,
   onRestart,
   onReset,
-  ctaHref = 'https://innoscience.com.br/contato',
+  ctaHref = CTA_URL,
 }: ResultViewProps) {
   const prefersReducedMotion = useReducedMotion();
   const [hoveredDimensionId, setHoveredDimensionId] = useState<DimensionId | null>(
     null
   );
   const [displayScore, setDisplayScore] = useState<number>(0);
+
+  const trackedCtaHref = buildTrackedCtaUrl({
+    baseUrl: ctaHref,
+    level: result.level,
+    overallAverage: result.overallAverage,
+    lead,
+    submissionId,
+  });
+
+  const commentEntries = defaultQuestions
+    .map((q) => ({
+      question: q,
+      text: comments?.[q.id]?.trim() ?? '',
+    }))
+    .filter((entry) => entry.text.length > 0);
 
   const handleRestart = () => {
     onRestart?.();
@@ -124,18 +157,19 @@ export function ResultView({
         {/* Header Institucional Preto */}
         <div className="bg-[#000000] text-[#FFFFFF] border-b border-[#292929]">
           <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FAB600] text-[#000000]">
-                <Compass className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div>
-                <span className="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#FAB600]">
-                  Innoscience
-                </span>
-                <span className="block text-xs text-[#E6E6E6]">
-                  Diagnóstico de Prontidão · Octógono da IA
-                </span>
-              </div>
+            <div className="flex items-center gap-3.5">
+              <Image
+                src="/logo-branca.png"
+                alt="Innoscience"
+                width={146}
+                height={40}
+                priority
+                className="h-7 sm:h-8 w-auto object-contain"
+              />
+              <span className="hidden sm:inline-block h-5 w-px bg-[#292929]" aria-hidden="true" />
+              <span className="text-xs font-medium text-[#E6E6E6]">
+                Diagnóstico de Prontidão · Octógono da IA
+              </span>
             </div>
           </div>
         </div>
@@ -180,7 +214,7 @@ export function ResultView({
               )}
 
               <a
-                href={ctaHref}
+                href={trackedCtaHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl border border-[#000000] bg-[#FFFFFF] px-6 py-3.5 text-sm font-bold text-[#000000] transition-colors hover:bg-[#F9FAFB]"
@@ -211,7 +245,7 @@ export function ResultView({
             </div>
 
             <a
-              href={ctaHref}
+              href={trackedCtaHref}
               target="_blank"
               rel="noopener noreferrer"
               className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#FAB600] px-6 py-3.5 text-sm font-bold text-[#000000] transition-all hover:bg-[#E0A400]"
@@ -234,13 +268,19 @@ export function ResultView({
       {/* Top Bar Institucional em Preto Puro (#000000) */}
       <div className="bg-[#000000] text-[#FFFFFF] border-b border-[#292929]">
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FAB600] text-[#000000]">
-              <Compass className="h-5 w-5" aria-hidden="true" />
-            </div>
+          <div className="flex items-center gap-3.5">
+            <Image
+              src="/logo-branca.png"
+              alt="Innoscience"
+              width={146}
+              height={40}
+              priority
+              className="h-7 sm:h-8 w-auto object-contain"
+            />
+            <span className="hidden sm:inline-block h-5 w-px bg-[#292929]" aria-hidden="true" />
             <div>
               <span className="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#FAB600]">
-                Diagnóstico Concluído · Innoscience
+                Diagnóstico Concluído
               </span>
               <span className="block text-xs text-[#E6E6E6]">
                 Leitura de Prontidão nas 8 Dimensões do Octógono da IA
@@ -248,16 +288,27 @@ export function ResultView({
             </div>
           </div>
 
-          {(onRestart || onReset) && (
-            <button
-              type="button"
-              onClick={handleRestart}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#E5E7EB] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#000000] transition-colors hover:bg-[#FAB600] hover:border-[#FAB600] cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Refazer diagnóstico</span>
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {lead && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#292929] bg-[#111111] px-3 py-1.5 text-xs text-[#E6E6E6]">
+                <Building2 className="h-3.5 w-3.5 text-[#FAB600]" aria-hidden="true" />
+                <strong className="text-[#FFFFFF]">{lead.company}</strong>
+                <span className="text-[#888888]">·</span>
+                <span>{lead.name}</span>
+              </span>
+            )}
+
+            {(onRestart || onReset) && (
+              <button
+                type="button"
+                onClick={handleRestart}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#E5E7EB] bg-[#FFFFFF] px-4 py-2 text-xs font-bold text-[#000000] transition-colors hover:bg-[#FAB600] hover:border-[#FAB600] cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Refazer diagnóstico</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -651,6 +702,40 @@ export function ResultView({
           </article>
         </motion.section>
 
+        {commentEntries.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.23, ease: [0.2, 0.8, 0.2, 1] }}
+            aria-label="Comentários registrados nas questões"
+            className="editorial-card p-6 sm:p-8 space-y-4"
+          >
+            <div className="flex items-center gap-2.5">
+              <MessageSquareText className="h-5 w-5 text-[#E0A400]" aria-hidden="true" />
+              <h2 className="font-editorial text-2xl text-[#111111]">
+                Comentários e observações registrados
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {commentEntries.map(({ question, text }) => (
+                <div
+                  key={question.id}
+                  className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-4 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs font-bold text-[#111111]">
+                    <span>
+                      Questão {String(question.id).padStart(2, '0')} · {question.title}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#333333] leading-relaxed whitespace-pre-line">
+                    {text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+        )}
+
         {/* 5. Bloco CTA da Innoscience em Alto Contraste Institucional (#000000 / #111111 com #FAB600) */}
         <motion.section
           initial={{ opacity: 0, y: 18 }}
@@ -681,7 +766,7 @@ export function ResultView({
 
             <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
               <a
-                href={ctaHref}
+                href={trackedCtaHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#FAB600] px-7 py-4 text-sm sm:text-base font-bold text-[#000000] shadow-[0_6px_24px_rgba(250,182,0,0.3)] transition-all duration-200 hover:bg-[#E0A400]"
@@ -709,3 +794,4 @@ export function ResultView({
 }
 
 export default ResultView;
+

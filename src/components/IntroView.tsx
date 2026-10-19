@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ArrowRight, Clock, Compass, HelpCircle, Layers, Sparkles } from 'lucide-react';
+import { ArrowRight, Clock, HelpCircle, Layers, Sparkles } from 'lucide-react';
 import {
   dimensions as defaultDimensions,
   instructionText as defaultInstructionText,
@@ -43,18 +44,19 @@ export function IntroView({
       {/* Header Institucional de Alto Contraste (#000000 / #111111 com destaques #FAB600) */}
       <div className="bg-[#000000] text-[#FFFFFF] border-b border-[#292929]">
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FAB600] text-[#000000]">
-              <Compass className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
-              <span className="block text-[11px] font-bold uppercase tracking-[0.2em] text-[#FAB600]">
-                Innoscience
-              </span>
-              <span className="block text-xs text-[#E6E6E6]">
-                Diagnóstico Executivo · Octógono da IA
-              </span>
-            </div>
+          <div className="flex items-center gap-3.5">
+            <Image
+              src="/logo-branca.png"
+              alt="Innoscience"
+              width={146}
+              height={40}
+              priority
+              className="h-7 sm:h-8 w-auto object-contain"
+            />
+            <span className="hidden sm:inline-block h-5 w-px bg-[#292929]" aria-hidden="true" />
+            <span className="text-xs font-medium text-[#E6E6E6]">
+              Diagnóstico Executivo · Octógono da IA
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-[#E6E6E6]">
@@ -139,7 +141,7 @@ export function IntroView({
               </button>
 
               <span className="text-xs text-[#6B7280]">
-                Leitura imediata ao final · Sem necessidade de cadastro prévio
+                Leitura imediata ao final · Diagnóstico executivo personalizado
               </span>
             </div>
           </motion.div>
@@ -154,7 +156,7 @@ export function IntroView({
             <div className="editorial-card p-5 sm:p-7 relative overflow-hidden">
               <div className="flex items-center justify-between text-xs mb-2 px-1">
                 <span className="uppercase tracking-[0.16em] font-bold text-[#292929]">
-                  Visão Sistêmica
+                  Octógono da IA
                 </span>
                 <span className="tabular-nums font-bold text-[#111111] bg-[#FFFBEB] border border-[#FAB600]/60 rounded-full px-2.5 py-0.5">
                   Escala 0,0 — 5,0

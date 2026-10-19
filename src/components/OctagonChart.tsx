@@ -171,7 +171,7 @@ export function OctagonChart({
   );
 
   const ariaSummary = isIdle
-    ? 'Representação visual do Octógono da IA com as oito dimensões avaliadas pela Innoscience: Estratégia, Liderança, Governança, Tecnologia, Cultura, Funding, Pessoas e Relacionamentos.'
+    ? 'Representação visual do Octógono da IA com as oito dimensões avaliadas pela Innoscience: Estratégia IA, Liderança IA, Governança IA, Tecnologia IA, Cultura IA, Funding IA, Pessoas IA e Relacionamentos IA.'
     : `Gráfico do Octógono da IA com as pontuações por dimensão: ${normalizedDimensions
         .map((d) => `${d.name}: ${formatScorePtBr(d.score)}`)
         .join('; ')}.`;
@@ -181,7 +181,7 @@ export function OctagonChart({
   return (
     <div className={`relative select-none ${className}`}>
       <svg
-        viewBox="-10 45 520 405"
+        viewBox="-24 45 548 405"
         role="img"
         aria-label={ariaSummary}
         className="w-full h-auto max-w-[480px] mx-auto"
@@ -448,7 +448,7 @@ export function OctagonChart({
                 y={placement.y}
                 textAnchor={placement.textAnchor}
                 fill={isHighlighted ? '#000000' : '#292929'}
-                fontSize={isHighlighted ? '17.5' : '16.5'}
+                fontSize={isHighlighted ? '16' : '15'}
                 fontWeight={isHighlighted ? 800 : 600}
                 fontFamily="var(--font-sans)"
                 className="transition-all duration-200"
