@@ -3,6 +3,107 @@ import { test } from 'node:test';
 import { calculateAssessment, calculateAverage, classifyMaturity } from '../src/lib/assessment-calc';
 import { buildTrackedCtaUrl, CTA_URL, dimensions, questions, scaleOptions } from '../src/data/assessment-data';
 import type { AssessmentAnswers } from '../src/types/assessment';
+import { resultContents } from '../src/data/assessment-data';
+import { buildRespondentEmailHtml, buildSupabaseSubmissionRows, sendRespondentWebhook } from '../src/lib/assessment-submission';
+
+test('respondent email includes each maturity narrative, dimensions, guidance and safe personalized content', () => {
+  for (const value of [1, 3, 5] as const) {
+    const { submissionRow } = buildSupabaseSubmissionRows({
+      submissionId: 'respondent-test',
+      lead: { name: '<script>alert("x")</script>', email: 'qa@example.com', phone: '11999990000', company: 'A&B', role: '<b>CEO</b>' },
+      answers: Object.fromEntries(questions.map(q => [q.id, value])) as AssessmentAnswers,
+      comments: { 1: '<img src=x onerror="alert(1)">' },
+    });
+    const html = buildRespondentEmailHtml({ submissionRow });
+    const content = resultContents[value === 1 ? 'inicial' : value === 3 ? 'em-desenvolvimento' : 'consolidado'];
+    assert.ok(html.startsWith('<!DOCTYPE html>'));
+    for (const text of [content.label, content.challenge, content.headline, ...content.paragraphs, content.guidanceTitle, ...content.guidance, ...dimensions.map(d => d.name), `${value},0 / 5,0`, '#000000', '#FAB600', '#F9FAFB', 'Principais Avanços', 'Principais Lacunas', 'Converse com nossos especialistas', 'Suas observações']) assert.ok(html.includes(text), text);
+    assert.ok(html.includes('A&amp;B'));
+    assert.ok(html.includes('&lt;b&gt;CEO&lt;/b&gt;'));
+    assert.ok(html.includes('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;'));
+    assert.ok(html.includes('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;'));
+    assert.ok(html.includes(submissionRow.cta_tracking_url.replaceAll('&', '&amp;')));
+    assert.ok(!/<script|<img|<b>CEO/.test(html));
+    assert.equal(buildRespondentEmailHtml({ submissionRow }), html);
+    submissionRow.cta_tracking_url = 'javascript:alert(1)';
+    const safeHtml = buildRespondentEmailHtml({ submissionRow });
+    assert.ok(!safeHtml.includes('javascript:'));
+    assert.ok(safeHtml.includes('href="https://innoscience.com.br/contato"'));
+  }
+});
+
+test('respondent email handles unknown answers, missing comments and mixed dimension scores', () => {
+  const { submissionRow } = buildSupabaseSubmissionRows({
+    submissionId: 'unknown', lead: { name: 'Ana', email: 'qa@example.com', phone: '11999990000', company: 'Empresa', role: 'CEO' },
+    answers: Object.fromEntries(questions.map(q => [q.id, 6])) as AssessmentAnswers,
+  });
+  const html = buildRespondentEmailHtml({ submissionRow });
+  assert.ok(html.includes('Sem classificação por enquanto'));
+  assert.ok(html.includes('Sem informação suficiente'));
+  assert.ok(html.includes('Como obter uma visão mais completa?'));
+  assert.ok(!html.includes('6,0 / 5,0'));
+  assert.ok(!html.includes('Suas observações'));
+  submissionRow.dimensions_summary[0].average = 0;
+  submissionRow.dimensions_summary[1].average = 2.5;
+  const mixed = buildRespondentEmailHtml({ submissionRow });
+  assert.ok(mixed.includes('0,0 / 5,0'));
+  assert.ok(mixed.includes('2,5 / 5,0'));
+});
+
+test('respondent webhook sends recipient aliases and rejects network and HTTP failures', async () => {
+  const { submissionRow } = buildSupabaseSubmissionRows({ submissionId: 'send-test', lead: { name: 'Ana', email: 'qa@example.com', phone: '11999990000', company: 'Empresa', role: 'CEO' }, answers: {} });
+  const options = { webhookUrl: 'https://example.com/respondent', email: 'qa@example.com', name: 'Ana', company: 'Empresa', subject: 'Resultado', html: '<html></html>', submissionRow };
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, options.webhookUrl);
+      assert.equal(init?.method, 'POST');
+      assert.deepEqual(JSON.parse(init?.body as string), { email: options.email, to: options.email, lead_email: options.email, name: options.name, company: options.company, subject: options.subject, html: options.html, submission: submissionRow });
+      return new Response(null, { status: 200 });
+    };
+    await sendRespondentWebhook(options);
+    globalThis.fetch = async () => new Response(null, { status: 503 });
+    await assert.rejects(sendRespondentWebhook(options), /HTTP 503/);
+    globalThis.fetch = async () => { throw new Error('Network failure'); };
+    await assert.rejects(sendRespondentWebhook(options), /Network failure/);
+  } finally { globalThis.fetch = original; }
+});
+
+test('API isolates both webhook failures after saving to Supabase', async () => {
+  const { POST } = await import('../src/app/api/assessment/route');
+  const originalFetch = globalThis.fetch;
+  const originalEnv = { ...process.env };
+  const originalError = console.error;
+  try {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://supabase.example.com';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+    process.env.N8N_WEBHOOK_URL = 'https://example.com/marketing';
+    process.env.N8N_RESPONDENT_WEBHOOK_URL = 'https://example.com/respondent';
+    console.error = () => {};
+    for (const [marketingOk, respondentOk] of [[true, true], [false, true], [true, false], [false, false]]) {
+      const calls: string[] = [];
+      globalThis.fetch = async (url) => {
+        const target = String(url);
+        calls.push(target);
+        if (target.includes('supabase.example.com')) return new Response(null, { status: 201 });
+        assert.equal(calls.filter(call => call.includes('supabase.example.com')).length, 2);
+        if (target.endsWith('/marketing') && !marketingOk) throw new Error('Network failure');
+        return new Response(null, { status: target.endsWith('/respondent') && !respondentOk ? 503 : 200 });
+      };
+      const response = await POST(new Request('https://example.com/api/assessment', { method: 'POST', body: JSON.stringify({ lead: { name: 'Ana', email: 'qa@example.com', phone: '11999990000', company: 'Empresa', role: 'CEO' }, answers: Object.fromEntries(questions.map(q => [q.id, 3])) }) }));
+      assert.equal(response.status, 201);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(body.webhookSent, marketingOk);
+      assert.equal(body.respondentWebhookSent, respondentOk);
+      assert.equal(calls.length, 4);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = originalEnv;
+    console.error = originalError;
+  }
+});
 
 test('conteúdo possui 16 questões únicas em 8 dimensões com sufixo IA, escala 0–6 e URL de rastreio', () => {
   assert.equal(questions.length, 16);

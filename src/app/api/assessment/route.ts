@@ -3,6 +3,9 @@ import { questions } from '@/data/assessment-data';
 import { isAnswerValue } from '@/lib/assessment-calc';
 import {
   isValidLead,
+  buildRespondentEmailHtml,
+  sendRespondentWebhook,
+  DEFAULT_N8N_RESPONDENT_WEBHOOK_URL,
   buildMarketingEmailHtml,
   sendMarketingWebhook,
   DEFAULT_N8N_WEBHOOK_URL,
@@ -126,24 +129,34 @@ export async function POST(request: Request) {
       questionRows,
     });
 
-    let webhookSent = false;
-    try {
-      await sendMarketingWebhook({
+    const [marketingResult, respondentResult] = await Promise.allSettled([
+      Promise.resolve().then(() => sendMarketingWebhook({
         webhookUrl: process.env.N8N_WEBHOOK_URL?.trim() || DEFAULT_N8N_WEBHOOK_URL,
         subject: `Novo assessment de IA - ${submissionRow.lead_company}`,
         html: buildMarketingEmailHtml({ submissionRow, questionRows, submittedAt: new Date().toISOString() }),
         submissionRow,
         questionRows,
-      });
-      webhookSent = true;
-    } catch (error) {
-      console.error('Assessment salvo; falha no webhook de marketing:', error);
-    }
+      })),
+      Promise.resolve().then(() => sendRespondentWebhook({
+        webhookUrl: process.env.N8N_RESPONDENT_WEBHOOK_URL?.trim() || DEFAULT_N8N_RESPONDENT_WEBHOOK_URL,
+        email: submissionRow.lead_email,
+        name: submissionRow.lead_name,
+        company: submissionRow.lead_company,
+        subject: `Seu diagnostico de IA - ${submissionRow.lead_company}`,
+        html: buildRespondentEmailHtml({ submissionRow }),
+        submissionRow,
+      })),
+    ]);
+    const webhookSent = marketingResult.status === 'fulfilled';
+    const respondentWebhookSent = respondentResult.status === 'fulfilled';
+    if (marketingResult.status === 'rejected') console.error('Assessment salvo; falha no webhook de marketing:', marketingResult.reason);
+    if (respondentResult.status === 'rejected') console.error('Assessment salvo; falha no webhook do respondente:', respondentResult.reason);
 
     return NextResponse.json(
       {
         ok: true,
         webhookSent,
+        respondentWebhookSent,
         submissionId,
         ctaTrackingUrl: submissionRow.cta_tracking_url,
       },

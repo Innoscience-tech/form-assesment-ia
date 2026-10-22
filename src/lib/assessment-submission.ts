@@ -347,6 +347,56 @@ export function buildMarketingEmailHtml(input: {
 }
 
 export const DEFAULT_N8N_WEBHOOK_URL = 'https://n8n.innoup.com.br/webhook/a678c7af-fecc-4fc9-b943-13848d27748c';
+export const DEFAULT_N8N_RESPONDENT_WEBHOOK_URL = 'https://n8n.innoup.com.br/webhook/f7ecc8fa-347a-44b8-9ad6-159a6bb6bff1';
+
+export function buildRespondentEmailHtml(input: { submissionRow: SupabaseSubmissionRow }): string {
+  const { submissionRow: row } = input;
+  const content = row.overall_average === null ? undefined : Object.values(resultContents).find(item => item.level === row.maturity_level);
+  const escape = escapeEmailHtml;
+  const score = (value: number | null) => value === null ? 'Sem informação suficiente' : `${value.toFixed(1).replace('.', ',')} / 5,0`;
+  const paragraph = (text: string) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.7;">${escape(text)}</p>`;
+  const section = (title: string, html: string) => `<tr><td style="padding:24px 28px;border-bottom:1px solid #E5E7EB;"><h2 style="margin:0 0 16px;font-size:21px;">${escape(title)}</h2>${html}</td></tr>`;
+  const ranking = (items: SupabaseSubmissionRow['strengths']) => items.length
+    ? items.map(item => paragraph(`${item.name}: ${score(item.average)}`)).join('')
+    : paragraph('As respostas disponíveis não permitem identificar destaques relativos nesta categoria.');
+  const dimensionRows = dimensions.map(dimension => {
+    const average = row.dimensions_summary.find(item => item.id === dimension.id)?.average ?? null;
+    return `<tr><th scope="row" align="left" style="padding:12px 8px;border-bottom:1px solid #E5E7EB;">${escape(dimension.name)}</th><td align="right" style="padding:12px 8px;border-bottom:1px solid #E5E7EB;">${escape(score(average))}</td></tr>`;
+  }).join('');
+  const comments = questions.filter(question => row.comments[String(question.id)]?.trim()).map(question => `<h3 style="font-size:16px;margin:16px 0 8px;">${escape(`${question.id}. ${question.title}`)}</h3><p style="margin:0 0 16px;font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;">${escape(row.comments[String(question.id)])}</p>`).join('');
+  // Attribute escaping alone does not block javascript: links.
+  let ctaUrl = 'https://innoscience.com.br/contato';
+  try {
+    const parsed = new URL(row.cta_tracking_url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') ctaUrl = parsed.href;
+  } catch { /* Keep the safe contact fallback. */ }
+  const reading = content
+    ? paragraph(content.headline) + content.paragraphs.map(paragraph).join('')
+    : paragraph('Suas respostas indicam que ainda falta visibilidade para uma leitura consistente da maturidade em IA. Isso não significa ausência de práticas: o próximo passo é reunir informações com as áreas responsáveis antes de definir prioridades.');
+  const guidance = content
+    ? content.guidance.map(paragraph).join('')
+    : paragraph('Converse com as lideranças e os responsáveis por dados, tecnologia e pessoas para mapear as práticas atuais. Com essa visão compartilhada, retome o diagnóstico e construa uma agenda de evolução conectada aos objetivos do negócio.');
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Seu diagnóstico de IA | Innoscience</title></head><body style="margin:0;background-color:#F9FAFB;color:#000000;font-family:Arial,Helvetica,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9FAFB;"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background-color:#FFFFFF;border-collapse:collapse;"><tr><td style="padding:32px 28px;background-color:#000000;border-bottom:6px solid #FAB600;"><p style="margin:0 0 16px;color:#FAB600;font-size:24px;font-weight:bold;">innoscience</p><h1 style="margin:0;color:#FFFFFF;font-size:28px;">Seu diagnóstico de IA</h1></td></tr>${section(`Olá, ${row.lead_name}`, paragraph(`${row.lead_role} · ${row.lead_company}`) + paragraph('Obrigado por compartilhar sua visão. Este diagnóstico oferece uma leitura inicial da prontidão da sua empresa e orienta onde concentrar os próximos esforços.'))}${section('Resultado Geral', `<p style="font-size:32px;font-weight:bold;margin:0 0 12px;">${escape(score(row.overall_average))}</p>` + paragraph(`Nível de maturidade: ${content?.label ?? 'Sem classificação por enquanto'}`) + paragraph(`Principal desafio: ${content?.challenge ?? 'Ampliar a visibilidade sobre as práticas de IA da empresa'}`))}${section('Leitura executiva', reading)}${section('As 8 Dimensões do Octógono da IA', `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;line-height:1.6;"><thead><tr><th align="left" style="padding:8px;background-color:#FAB600;">Dimensão</th><th align="right" style="padding:8px;background-color:#FAB600;">Nota</th></tr></thead><tbody>${dimensionRows}</tbody></table>` + paragraph('As respostas “Não sei informar” são desconsideradas nas médias.'))}${section('Principais Avanços', ranking(row.strengths))}${section('Principais Lacunas', ranking(row.gaps))}${section(content?.guidanceTitle ?? 'Como obter uma visão mais completa?', guidance)}${comments ? section('Suas observações', comments) : ''}${section('Transforme o diagnóstico em ação', paragraph(content?.callout ?? 'Construa uma visão compartilhada para orientar sua jornada de IA.') + paragraph(content?.support ?? 'A Innoscience apoia sua empresa na identificação de prioridades e na construção das condições para uma adoção de IA orientada a valor.') + `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px;background-color:#FAB600;"><a href="${escape(ctaUrl)}" style="font-size:15px;font-weight:bold;color:#000000;text-decoration:none;">Converse com nossos especialistas</a></td></tr></table>`)}<tr><td style="padding:24px 28px;font-size:12px;background-color:#F9FAFB;">Innoscience · Octógono da IA</td></tr></table></td></tr></table></body></html>`;
+}
+
+export async function sendRespondentWebhook(options: {
+  webhookUrl: string;
+  email: string;
+  name: string;
+  company: string;
+  subject: string;
+  html: string;
+  submissionRow: SupabaseSubmissionRow;
+}): Promise<void> {
+  const { webhookUrl, email, name, company, subject, html, submissionRow } = options;
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ email, to: email, lead_email: email, name, company, subject, html, submission: submissionRow }),
+  });
+  if (!response.ok) throw new Error(`Falha no webhook do respondente (HTTP ${response.status}).`);
+}
 
 export async function sendMarketingWebhook(options: {
   webhookUrl: string;
